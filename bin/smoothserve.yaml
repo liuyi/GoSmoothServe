@@ -1,0 +1,2 @@
+CommandPort: 8080
+SubConfigDir: ./services

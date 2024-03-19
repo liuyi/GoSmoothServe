@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="0660bad5-11f7-4f21-b7da-27165400351c" name="本地虚拟机">
+        <fileTransfer rootFolder="/data/www/smoothserve" accessType="SFTP" host="172.16.151.10" port="22" sshConfigId="9c0dcfb8-e8e6-44c7-b0fc-bc667ea092c2" sshConfig="liuyi@172.16.151.10:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="60000" passiveMode="true" shareSSLContext="true" isUseSudo="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

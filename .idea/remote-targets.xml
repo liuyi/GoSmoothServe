@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <targets>
+      <target name="liuyi@172.16.151.10:22" type="ssh/sftp" uuid="76af07bf-0d29-47e4-a2a5-8e7451d7151d">
+        <config>
+          <option name="projectRootOnTarget" value="/data/www/smoothserve" />
+          <option name="serverName" value="liuyi@172.16.151.10:22 password" />
+          <option name="useRsync" value="true" />
+        </config>
+        <ContributedStateBase type="GoLanguageRuntime">
+          <config>
+            <option name="compiledExecutablesVolume">
+              <VolumeState>
+                <option name="remotePath" value="/data/www/smoothserve/bin" />
+              </VolumeState>
+            </option>
+            <option name="goPath" value="/home/liuyi/go" />
+            <option name="goRoot" value="/usr/local/go/bin/go" />
+            <option name="goVersion" value="go1.21.3 linux/amd64" />
+            <option name="projectSourcesVolume">
+              <VolumeState>
+                <option name="remotePath" value="/data/www/smoothserve" />
+              </VolumeState>
+            </option>
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>

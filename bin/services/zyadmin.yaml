@@ -1,0 +1,5 @@
+name: zyadmin
+port: 8080
+start_instance_port: 8086
+instance_count: 4
+executable_path: /data/www/zyaps/build/zyaps_linux

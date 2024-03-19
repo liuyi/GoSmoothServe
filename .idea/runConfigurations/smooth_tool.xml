@@ -1,0 +1,14 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="smooth-tool" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="go-smooth-serve" />
+    <target name="liuyi@172.16.151.10:22" />
+    <working_directory value="$PROJECT_DIR$/bin" />
+    <parameters value="-o smoothtool" />
+    <kind value="FILE" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="|$PROJECT_DIR$/tool/smoothtool.go" />
+    <output_directory value="$PROJECT_DIR$/bin" />
+    <option name="build_on_remote_target" value="true" />
+    <method v="2" />
+  </configuration>
+</component>
