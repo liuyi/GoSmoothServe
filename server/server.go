@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"os"
 	"server/config"
-	"server/reverse_proxy"
+	"server/service"
 )
 
 var configPath = "./smoothserve.yaml"
 
-// var ServicesMap map[string]*service.Service = make(map[string]*service.Service)
-var proxyMap map[string]*reverse_proxy.ReverseProxy = make(map[string]*reverse_proxy.ReverseProxy)
+var ServicesMap map[string]*service.Service = make(map[string]*service.Service)
+
+//var proxyMap map[string]*reverse_proxy.ReverseProxy = make(map[string]*reverse_proxy.ReverseProxy)
 
 func main() {
 
@@ -35,7 +36,7 @@ func main() {
 
 func createProxy(serviceData config.ServiceData) {
 	// 启动反向代理服务器
-	proxy := reverse_proxy.New(serviceData)
-	proxyMap[serviceData.Name] = proxy
-	proxy.Start()
+	srv := service.New(serviceData)
+	ServicesMap[serviceData.Name] = srv
+	srv.Start()
 }

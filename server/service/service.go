@@ -3,10 +3,13 @@ package service
 import (
 	"bufio"
 	"fmt"
+	"net/http"
+	"net/http/httputil"
 	"os/exec"
 	"path/filepath"
 	"server/config"
 	"strconv"
+	"sync"
 )
 
 type ServiceInstance struct {
@@ -21,14 +24,27 @@ type Service struct {
 	Data          config.ServiceData
 	Instances     []ServiceInstance
 	instanceIndex int
+	mutex         sync.Mutex
 }
 
 func New(serviceData config.ServiceData) *Service {
 	service := Service{Name: serviceData.Name, Data: serviceData}
 	return &service
 }
-
 func (service *Service) Start() {
+	// 创建反向代理服务器
+	// 启动 HTTP 服务器并监听指定端口
+	go service.startAllInstance()
+
+	http.HandleFunc("/", service.handleRequest)
+	fmt.Printf("Reverse Proxy Server for Service %s started on port %d\n", service.Name, service.Data.Port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
+	if err != nil {
+		fmt.Printf("Failed to start Reverse Proxy Server for Service %s: %s\n", service.Name, err)
+	}
+
+}
+func (service *Service) startAllInstance() {
 	// 根据配置启动服务实例，并添加到 ServicesMap 中
 	if service.Instances == nil {
 		instances := make([]ServiceInstance, service.Data.InstanceCount)
@@ -112,4 +128,32 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 	fmt.Println("return cmd pid:", pid)
 	// 返回进程 ID
 	return pid, nil
+}
+func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
+	// 选择一个服务实例处理请求
+	service.mutex.Lock()
+	defer service.mutex.Unlock()
+	instance := service.SelectInstance()
+	if instance == nil {
+		http.Error(w, "No available instance", http.StatusServiceUnavailable)
+		return
+	}
+
+	// 构建代理地址
+	proxyURL := fmt.Sprintf("127.0.0.1:%d", instance.Port)
+
+	//fmt.Println("proxy instance.Port:", instance.Port)
+	fmt.Println("proxy url:", proxyURL)
+	// 创建反向代理
+	rp := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = "http"
+			req.URL.Host = proxyURL
+			req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
+			req.Host = instance.Host // 更新 Host，确保正确代理
+		},
+	}
+
+	// 执行反向代理
+	rp.ServeHTTP(w, r)
 }
