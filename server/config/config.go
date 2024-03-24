@@ -10,11 +10,13 @@ import (
 )
 
 type ServiceData struct {
-	Name              string `yaml:"name"`
-	Port              int    `yaml:"port"`
-	StartInstancePort int    `yaml:"start_instance_port"`
-	InstanceCount     int    `yaml:"instance_count"`
-	ExecutablePath    string `yaml:"executable_path"`
+	Name              string   `yaml:"name"`
+	Port              int      `yaml:"port"`
+	StartInstancePort int      `yaml:"start_instance_port"`
+	InstanceCount     int      `yaml:"instance_count"`
+	ExecutablePath    string   `yaml:"executable_path"`
+	AutoRestart       bool     `yaml:"auto_restart"`
+	WatchFiles        []string `yaml:"watch_files"`
 }
 
 type SmoothServeConfig struct {

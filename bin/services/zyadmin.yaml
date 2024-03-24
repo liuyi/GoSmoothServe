@@ -1,5 +1,15 @@
 name: zyadmin
-port: 8080
+port: 8085
 start_instance_port: 8086
-instance_count: 4
+instance_count: 1
 executable_path: /data/www/zyaps/build/zyaps_linux
+auto_restart: true
+watch_files:
+  - ./view
+  - ./go_build_main_go_linux
+  - ./config
+  - ./view/common/server_error.html
+  - ./web/admin/index.html
+  - ./web/admin/install/index.html
+  - ./web/admin/manage/index.html
+
