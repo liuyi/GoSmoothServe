@@ -6,10 +6,11 @@ executable_path: /data/www/zyaps/build/zyaps_linux
 auto_restart: true
 watch_files:
   - ./view
-  - ./go_build_main_go_linux
+  - ./zyaps_linux
   - ./config
   - ./view/common/server_error.html
   - ./web/admin/index.html
   - ./web/admin/install/index.html
   - ./web/admin/manage/index.html
+
 

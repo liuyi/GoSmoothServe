@@ -3,6 +3,7 @@ package service
 import (
 	"bufio"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"net/http"
 	"net/http/httputil"
 	"os/exec"
@@ -25,6 +26,7 @@ type Service struct {
 	Instances     []ServiceInstance
 	instanceIndex int
 	mutex         sync.Mutex
+	watcher       *fsnotify.Watcher
 }
 
 func New(serviceData config.ServiceData) *Service {
@@ -35,6 +37,7 @@ func (service *Service) Start() {
 	// 创建反向代理服务器
 	// 启动 HTTP 服务器并监听指定端口
 	go service.startAllInstance()
+	go service.initWatcher()
 
 	http.HandleFunc("/", service.handleRequest)
 	fmt.Printf("Reverse Proxy Server for Service %s started on port %d\n", service.Name, service.Data.Port)
@@ -156,4 +159,99 @@ func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	// 执行反向代理
 	rp.ServeHTTP(w, r)
+}
+func (service *Service) initWatcher() {
+	// 创建新的fsnotify watcher
+	fmt.Println("init file watcher")
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		fmt.Println("Error creating watcher:", err)
+		return
+	}
+	service.watcher = watcher
+
+	rootDir := filepath.Dir(service.Data.ExecutablePath)
+
+	// 向Watcher添加要监视的文件和文件夹路径
+	for _, path := range service.Data.WatchFiles {
+		absFilePath := filepath.Join(rootDir, path)
+		fmt.Println("abs path:", absFilePath)
+		err = watcher.Add(absFilePath)
+		if err != nil {
+			fmt.Printf("Error adding path %s to watcher: %s\n", absFilePath, err)
+			return
+		}
+	}
+
+	// 启动协程监视文件更改
+	go func() {
+		defer func(watcher *fsnotify.Watcher) {
+			fmt.Println("Close watcher>>>>>>>>>>>>>>>")
+			err := watcher.Close()
+			if err != nil {
+				fmt.Println("close watcher error", err)
+			}
+		}(watcher)
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				fmt.Println("Event:", event.Name, "event.Op:", event.Op, event.Op&fsnotify.Write, fsnotify.Write)
+
+				//
+				//if event.Op&fsnotify.Write == fsnotify.Write ||
+				//	event.Op&fsnotify.Create == fsnotify.Create ||
+				//	event.Op&fsnotify.Remove == fsnotify.Remove ||
+				//	event.Op&fsnotify.Rename == fsnotify.Rename {
+				//
+				//	// 如果发生了写入、创建或删除事件，则重新加载服务实例
+				//	service.RestartInstances()
+				//}
+
+				service.RestartInstances()
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				fmt.Println("Error:", err)
+			}
+		}
+	}()
+}
+
+func (service *Service) RestartInstances() {
+	// 停止并重新启动所有服务实例
+	for i, instance := range service.Instances {
+		fmt.Printf("Stopping instance %d\n", i)
+		err := service.StopInstance(instance.Pid)
+		if err != nil {
+			fmt.Printf("Error stopping instance %d: %s\n", i, err)
+			continue
+		}
+		fmt.Printf("Starting instance %d\n", i)
+		pid, err := service.StartInstance(service.Data.Name, instance.Port, service.Data.ExecutablePath)
+		if err != nil {
+			fmt.Printf("Error starting instance %d: %s\n", i, err)
+			continue
+		}
+		service.Instances[i].Pid = pid
+		//重启完毕后 如果不重新设置watcher 那么如果更新正在执行的go二进制文件，则不会有事件，系统有缓存机制。
+		watcherErr := service.watcher.Close()
+		if watcherErr != nil {
+			return
+		}
+		go service.initWatcher()
+	}
+}
+
+func (service *Service) StopInstance(pid string) error {
+	// 停止指定进程
+	cmd := exec.Command("kill", "-TERM", pid)
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
 }
