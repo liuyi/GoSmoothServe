@@ -16,6 +16,7 @@ type ServiceData struct {
 	InstanceCount     int      `yaml:"instance_count"`
 	ExecutablePath    string   `yaml:"executable_path"`
 	AutoRestart       bool     `yaml:"auto_restart"`
+	DelayRunningTime  int      `yaml:"delay_running_time"` //启动后等几秒进入可服务状态
 	WatchFiles        []string `yaml:"watch_files"`
 }
 

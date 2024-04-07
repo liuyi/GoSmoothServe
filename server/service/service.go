@@ -11,6 +11,16 @@ import (
 	"server/config"
 	"strconv"
 	"sync"
+	"time"
+)
+
+const (
+	StatusNone = iota
+	StatusStopped
+	StatusStopping
+	StatusWillRunning
+	StatusWaitingStop
+	StatusRunning
 )
 
 type ServiceInstance struct {
@@ -23,7 +33,7 @@ type ServiceInstance struct {
 type Service struct {
 	Name          string
 	Data          config.ServiceData
-	Instances     []ServiceInstance
+	Instances     []*ServiceInstance
 	instanceIndex int
 	mutex         sync.Mutex
 	watcher       *fsnotify.Watcher
@@ -50,7 +60,7 @@ func (service *Service) Start() {
 func (service *Service) startAllInstance() {
 	// 根据配置启动服务实例，并添加到 ServicesMap 中
 	if service.Instances == nil {
-		instances := make([]ServiceInstance, service.Data.InstanceCount)
+		instances := make([]*ServiceInstance, service.Data.InstanceCount)
 		service.Instances = instances
 	} else {
 		//如果已经存在，就不要继续了
@@ -67,7 +77,7 @@ func (service *Service) startAllInstance() {
 			fmt.Println("Failed to start service instance:", err)
 			continue
 		}
-		instance := ServiceInstance{Pid: pid, Port: port, Status: 1}
+		instance := &ServiceInstance{Pid: pid, Port: port, Status: StatusRunning}
 		service.Instances[i] = instance
 	}
 
@@ -81,9 +91,9 @@ func (service *Service) SelectInstance() *ServiceInstance {
 	service.instanceIndex = (service.instanceIndex) % instanceCount // 更新索引，实现轮询
 
 	for i := 0; i < instanceCount; i++ {
-		instance := &service.Instances[service.instanceIndex]
+		instance := service.Instances[service.instanceIndex]
 		service.instanceIndex = (service.instanceIndex + 1) % instanceCount // 更新索引，实现轮询
-		if instance.Status == 1 {
+		if instance.Status >= StatusWaitingStop {
 			fmt.Println("selected index", service.instanceIndex, "instanceCount:", instanceCount)
 			return instance
 		}
@@ -91,6 +101,7 @@ func (service *Service) SelectInstance() *ServiceInstance {
 
 	return nil
 }
+
 func (service *Service) StartInstance(name string, port int, executablePath string) (string, error) {
 	// 启动指定的 HTTP 服务器进程，并传递端口号作为参数
 	cmd := exec.Command(executablePath, "--port="+strconv.Itoa(port))
@@ -125,7 +136,28 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 
 			fmt.Println("Process exited with error:", err)
 		}
-		fmt.Println("wait cmd finish")
+		fmt.Println(" cmd finished")
+		//查看当前是不是实例是不是需要重启
+		instance := service.getInstance(pid)
+		fmt.Println("instance status:", instance.Status, "/", StatusWaitingStop, " pid:", instance.Pid)
+		if instance.Status == StatusStopping {
+			//被彻底停止，现在需要被重启
+			instance.Status = StatusStopped
+			newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
+			if err != nil {
+
+				fmt.Println("start instance error ", err)
+				return
+			}
+			instance.Pid = newPid
+			//启动后等几秒钟再使其进入可服务状态，没有监听instance的cmd输出内容来判断，因为不希望那么耦合
+			instance.Status = StatusWillRunning
+			time.Sleep(time.Duration(service.Data.DelayRunningTime) * time.Second)
+			instance.Status = StatusRunning
+
+			//启动以后再开始停止下一个
+			service.stopOne()
+		}
 	}()
 
 	fmt.Println("return cmd pid:", pid)
@@ -210,7 +242,7 @@ func (service *Service) initWatcher() {
 				//	service.RestartInstances()
 				//}
 
-				service.RestartInstances()
+				service.RestartOneByOne()
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -221,15 +253,70 @@ func (service *Service) initWatcher() {
 	}()
 }
 
-func (service *Service) RestartInstances() {
+func (service *Service) getInstance(pid string) *ServiceInstance {
+	for _, instance := range service.Instances {
+		if instance.Pid == pid {
+			return instance
+		}
+	}
+	return nil
+}
+
+func (service *Service) RestartOneByOne() {
+	for _, instance := range service.Instances {
+		//先标记为都需要停止
+		instance.Status = StatusWaitingStop
+
+		fmt.Println("restart one by one instance.Status: ", instance.Status, " / ", StatusWaitingStop)
+	}
+	fmt.Println("restart one by one.")
+	//开始停止第一个
+	service.stopOne()
+
+}
+
+func (service *Service) stopOne() {
+	fmt.Println("stopOne")
+	var selectedInstance *ServiceInstance
+	for _, instance := range service.Instances {
+		//先标记为都需要停止
+		if instance.Status == StatusWaitingStop {
+			selectedInstance = instance
+			break
+		}
+
+		fmt.Println("stopOne Status:", instance.Status, " / ", StatusWaitingStop, " len:", len(service.Instances))
+	}
+
+	if selectedInstance == nil {
+		//已经没有需要停止的了
+
+		fmt.Println("no selectedInstance ")
+
+		return
+	}
+
+	//开始停止第一个
+	selectedInstance.Status = StatusStopping
+	err := service.StopInstance(selectedInstance.Pid)
+	if err != nil {
+		fmt.Println("stop instance failed,pid:", selectedInstance.Pid+", error:", err)
+		return
+	}
+
+}
+
+func (service *Service) RestartAllInstances() {
 	// 停止并重新启动所有服务实例
 	for i, instance := range service.Instances {
+		instance.Status = StatusWaitingStop
 		fmt.Printf("Stopping instance %d\n", i)
 		err := service.StopInstance(instance.Pid)
 		if err != nil {
 			fmt.Printf("Error stopping instance %d: %s\n", i, err)
 			continue
 		}
+
 		fmt.Printf("Starting instance %d\n", i)
 		pid, err := service.StartInstance(service.Data.Name, instance.Port, service.Data.ExecutablePath)
 		if err != nil {
