@@ -3,6 +3,9 @@
     <module name="go-smooth-serve" />
     <target name="liuyi@172.16.151.10:22" />
     <working_directory value="$PROJECT_DIR$/bin" />
+    <envs>
+      <env name="GIN_MODE" value="release" />
+    </envs>
     <kind value="FILE" />
     <package value="go-smooth-serve/bin" />
     <directory value="$PROJECT_DIR$" />

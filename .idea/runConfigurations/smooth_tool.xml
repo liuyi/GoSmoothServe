@@ -3,8 +3,10 @@
     <module name="go-smooth-serve" />
     <target name="liuyi@172.16.151.10:22" />
     <working_directory value="$PROJECT_DIR$/bin" />
-    <parameters value="-o smoothtool" />
+    <go_parameters value="-o smoothtool" />
+    <parameters value="stop" />
     <kind value="FILE" />
+    <package value="go-smooth-serve/bin" />
     <directory value="$PROJECT_DIR$" />
     <filePath value="|$PROJECT_DIR$/tool/smoothtool.go" />
     <output_directory value="$PROJECT_DIR$/bin" />

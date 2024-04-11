@@ -68,7 +68,6 @@ func (service *Service) startAllInstance() {
 		return
 	}
 
-	fmt.Println("InstanceCount:", service.Data.InstanceCount)
 	for i := 0; i < service.Data.InstanceCount; i++ {
 		port := service.Data.StartInstancePort + i
 		// 启动服务实例
@@ -94,7 +93,6 @@ func (service *Service) SelectInstance() *ServiceInstance {
 		instance := service.Instances[service.instanceIndex]
 		service.instanceIndex = (service.instanceIndex + 1) % instanceCount // 更新索引，实现轮询
 		if instance.Status >= StatusWaitingStop {
-			fmt.Println("selected index", service.instanceIndex, "instanceCount:", instanceCount)
 			return instance
 		}
 	}
@@ -108,7 +106,7 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 	cmd.Dir = filepath.Dir(executablePath)
 
 	// 设置合适的环境变量等
-	fmt.Println("cmd:", cmd)
+
 	stdout, err := cmd.StdoutPipe()
 
 	// 启动命令
@@ -128,18 +126,16 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 	// 获取进程 ID
 	pid := fmt.Sprintf("%d", cmd.Process.Pid)
 
-	fmt.Println("Start service on pid:", pid)
-
 	// 等待进程退出
 	go func() {
 		if err := cmd.Wait(); err != nil {
 
 			fmt.Println("Process exited with error:", err)
 		}
-		fmt.Println(" cmd finished")
+
 		//查看当前是不是实例是不是需要重启
 		instance := service.getInstance(pid)
-		fmt.Println("instance status:", instance.Status, "/", StatusWaitingStop, " pid:", instance.Pid)
+
 		if instance.Status == StatusStopping {
 			//被彻底停止，现在需要被重启
 			instance.Status = StatusStopped
@@ -160,7 +156,6 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 		}
 	}()
 
-	fmt.Println("return cmd pid:", pid)
 	// 返回进程 ID
 	return pid, nil
 }
@@ -177,8 +172,6 @@ func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// 构建代理地址
 	proxyURL := fmt.Sprintf("127.0.0.1:%d", instance.Port)
 
-	//fmt.Println("proxy instance.Port:", instance.Port)
-	fmt.Println("proxy url:", proxyURL)
 	// 创建反向代理
 	rp := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
@@ -194,7 +187,6 @@ func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 func (service *Service) initWatcher() {
 	// 创建新的fsnotify watcher
-	fmt.Println("init file watcher")
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		fmt.Println("Error creating watcher:", err)
@@ -207,7 +199,6 @@ func (service *Service) initWatcher() {
 	// 向Watcher添加要监视的文件和文件夹路径
 	for _, path := range service.Data.WatchFiles {
 		absFilePath := filepath.Join(rootDir, path)
-		fmt.Println("abs path:", absFilePath)
 		err = watcher.Add(absFilePath)
 		if err != nil {
 			fmt.Printf("Error adding path %s to watcher: %s\n", absFilePath, err)
@@ -218,7 +209,7 @@ func (service *Service) initWatcher() {
 	// 启动协程监视文件更改
 	go func() {
 		defer func(watcher *fsnotify.Watcher) {
-			fmt.Println("Close watcher>>>>>>>>>>>>>>>")
+			fmt.Println("Close watcher")
 			err := watcher.Close()
 			if err != nil {
 				fmt.Println("close watcher error", err)
@@ -267,16 +258,14 @@ func (service *Service) RestartOneByOne() {
 		//先标记为都需要停止
 		instance.Status = StatusWaitingStop
 
-		fmt.Println("restart one by one instance.Status: ", instance.Status, " / ", StatusWaitingStop)
 	}
-	fmt.Println("restart one by one.")
+
 	//开始停止第一个
 	service.stopOne()
 
 }
 
 func (service *Service) stopOne() {
-	fmt.Println("stopOne")
 	var selectedInstance *ServiceInstance
 	for _, instance := range service.Instances {
 		//先标记为都需要停止
@@ -285,13 +274,12 @@ func (service *Service) stopOne() {
 			break
 		}
 
-		fmt.Println("stopOne Status:", instance.Status, " / ", StatusWaitingStop, " len:", len(service.Instances))
 	}
 
 	if selectedInstance == nil {
 		//已经没有需要停止的了
 
-		fmt.Println("no selectedInstance ")
+		fmt.Println("no selectedInstance,all instance stopped ")
 
 		return
 	}
