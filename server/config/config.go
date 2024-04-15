@@ -12,6 +12,7 @@ import (
 type ServiceData struct {
 	Name              string   `yaml:"name"`
 	ServerName        string   `yaml:"server_name"`
+	ServerIp          string   `yaml:"server_ip"`
 	Port              int      `yaml:"port"`
 	StartInstancePort int      `yaml:"start_instance_port"`
 	InstanceCount     int      `yaml:"instance_count"`
@@ -74,20 +75,24 @@ func LoadServerMap(configDir string) {
 		if err != nil {
 			continue
 		}
-		var service ServiceData
-		err = yaml.Unmarshal(data, &service)
+		var serviceData ServiceData
+		err = yaml.Unmarshal(data, &serviceData)
 		if err != nil {
-			fmt.Println("Parse service config failed, skip  config file :", file)
+			fmt.Println("Parse serviceData config failed, skip  config file :", file)
 			fmt.Println(err)
 			continue
 		}
 
-		if service.Port == 0 || service.ServerName == "" || service.InstanceCount == 0 {
-			fmt.Println("Parse service config failed, skip config file :", file)
+		if serviceData.Port == 0 || serviceData.ServerName == "" || serviceData.InstanceCount == 0 {
+			fmt.Println("Parse serviceData config failed, skip config file :", file)
 			fmt.Println(err)
 			continue
 		}
-		ServicesDataMap[service.Name] = service
+
+		if serviceData.ServerIp == "" {
+			serviceData.ServerIp = "127.0.0.1"
+		}
+		ServicesDataMap[serviceData.Name] = serviceData
 
 	}
 }

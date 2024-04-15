@@ -1,5 +1,6 @@
 name: zyaps
 server_name: "local.zyaps.com , local_api.zyaps.com"
+server_ip:  127.0.0.1
 port: 8085
 start_instance_port: 8086
 instance_count: 3

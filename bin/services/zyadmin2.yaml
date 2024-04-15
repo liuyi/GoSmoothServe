@@ -1,5 +1,6 @@
 name: zyadmin
 server_name: "local.zyadmin.com, local_api.zyadmin.com"
+server_ip: 127.0.0.1
 port: 8010
 start_instance_port: 8011
 instance_count: 2

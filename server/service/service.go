@@ -177,8 +177,8 @@ func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 构建代理地址
-	proxyURL := fmt.Sprintf("127.0.0.1:%d", instance.Port)
+	// 构建代理地址 目前仅支持本地的ip,因为服务启动过的方式就是通过调用本地命令行执行的，如果要支持代理到不同的服务器，则还需要增加远程启动服务的方式，目前没有这个需求就不加了。
+	proxyURL := fmt.Sprintf("%s:%d", service.Data.ServerIp, instance.Port)
 
 	// 创建反向代理
 	rp := &httputil.ReverseProxy{
