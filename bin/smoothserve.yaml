@@ -1,2 +1,4 @@
 CommandPort: 8080
+ProxyAddr: "127.0.0.1"
+ProxyPort: 8085
 SubConfigDir: ./services

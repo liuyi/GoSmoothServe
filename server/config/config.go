@@ -11,6 +11,7 @@ import (
 
 type ServiceData struct {
 	Name              string   `yaml:"name"`
+	ServerName        string   `yaml:"server_name"`
 	Port              int      `yaml:"port"`
 	StartInstancePort int      `yaml:"start_instance_port"`
 	InstanceCount     int      `yaml:"instance_count"`
@@ -22,6 +23,8 @@ type ServiceData struct {
 
 type SmoothServeConfig struct {
 	CommandPort  int
+	ProxyAddr    string
+	ProxyPort    int
 	SubConfigDir string
 }
 
@@ -74,7 +77,13 @@ func LoadServerMap(configDir string) {
 		var service ServiceData
 		err = yaml.Unmarshal(data, &service)
 		if err != nil {
-			fmt.Println("Parse service config failed, path :", file)
+			fmt.Println("Parse service config failed, skip  config file :", file)
+			fmt.Println(err)
+			continue
+		}
+
+		if service.Port == 0 || service.ServerName == "" || service.InstanceCount == 0 {
+			fmt.Println("Parse service config failed, skip config file :", file)
 			fmt.Println(err)
 			continue
 		}

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"server/config"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -49,7 +50,14 @@ func (service *Service) Start() {
 	go service.startAllInstance()
 	go service.initWatcher()
 
-	http.HandleFunc("/", service.handleRequest)
+	//http.HandleFunc("/", service.handleRequest)
+	//检测是否有多个名字
+	serverNameArr := strings.Split(service.Data.ServerName, ",")
+	for _, serverName := range serverNameArr {
+		serverName := strings.TrimSpace(serverName)
+		http.HandleFunc(serverName+"/", service.handleRequest)
+	}
+
 	fmt.Printf("Reverse Proxy Server for Service %s started on port %d\n", service.Name, service.Data.Port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
 	if err != nil {

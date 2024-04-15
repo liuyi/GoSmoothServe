@@ -1,8 +1,8 @@
-name: zyaps
-server_name: "local.zyaps.com , local_api.zyaps.com"
-port: 8085
-start_instance_port: 8086
-instance_count: 3
+name: zyadmin
+server_name: "local.zyadmin.com, local_api.zyadmin.com"
+port: 8010
+start_instance_port: 8011
+instance_count: 2
 executable_path: /data/www/zyaps/build/zyaps_linux
 auto_restart: true
 delay_running_time: 3
