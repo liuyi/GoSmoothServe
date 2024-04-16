@@ -17,8 +17,8 @@ var (
 	action          string
 	start           string
 	stop            string
-	smoothServeName string = "smooth_serve_linux"
-	smoothServePath string = "./smooth_serve_linux"
+	smoothServeName string = "smoothserve"
+	smoothServePath string = "./smoothserve"
 )
 
 func main() {

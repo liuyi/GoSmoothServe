@@ -1,0 +1,17 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="smoothserve" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="go-smooth-serve" />
+    <target name="liuyi@172.16.151.10:22" />
+    <working_directory value="$PROJECT_DIR$/bin" />
+    <go_parameters value="-o $PROJECT_DIR$/bin/smoothserve" />
+    <envs>
+      <env name="GIN_MODE" value="release" />
+    </envs>
+    <kind value="FILE" />
+    <package value="go-smooth-serve/bin" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/server/server.go" />
+    <output_directory value="$PROJECT_DIR$/bin" />
+    <method v="2" />
+  </configuration>
+</component>

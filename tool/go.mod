@@ -1,4 +1,4 @@
-module tool
+module smoothtool
 
 go 1.21
 

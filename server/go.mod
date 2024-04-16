@@ -1,4 +1,4 @@
-module server
+module smoothserver
 
 go 1.21
 

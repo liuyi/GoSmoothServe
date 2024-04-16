@@ -8,7 +8,7 @@ import (
 	"net/http/httputil"
 	"os/exec"
 	"path/filepath"
-	"server/config"
+	"smoothserver/config"
 	"strconv"
 	"strings"
 	"sync"

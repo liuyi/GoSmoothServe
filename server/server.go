@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"server/config"
-	"server/service"
+	"smoothserver/config"
+	"smoothserver/service"
 )
 
 var configPath = "./smoothserve.yaml"
