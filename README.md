@@ -80,5 +80,11 @@ watch_files: #自动重启时，监听的文件和文件夹列表
 
 ````
         
-
+### 被代理的Web服务注意事项
++ 为了实现多个实例同时运行，需要在启动的时候读取命令行参数port，动态设置http请求的端口号
+  可以使用flag标准库来实现:
+  ````go
+    var servicePort int =0
+    flag.IntVar(&servicePort, "port", 8081, "启动服务的端口")
+  ````
  

@@ -84,3 +84,11 @@ watch_files: # List of files and directories to monitor for automatic restarts.
   - ./your/web/files
   - ./files/in/your/web/service/folder
 ````
+
+### Considerations for the Web Service being Proxied
++ To enable multiple instances to run simultaneously, it's necessary to read the command-line argument `port` during startup and dynamically set the port number for HTTP requests.
+  This can be achieved using the `flag` standard library:
+  ```go
+    var servicePort int = 0
+    flag.IntVar(&servicePort, "port", 8081, "Port to start the service")
+  ```
