@@ -2,6 +2,7 @@ package service
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
 	"net/http"
@@ -25,10 +26,11 @@ const (
 )
 
 type ServiceInstance struct {
-	Pid    string
-	Port   int
-	Status int
-	Host   string
+	Pid         string
+	Port        int
+	Status      int
+	Host        string
+	NeedRestart bool
 }
 
 type Service struct {
@@ -147,20 +149,24 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 		if instance.Status == StatusStopping {
 			//被彻底停止，现在需要被重启
 			instance.Status = StatusStopped
-			newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
-			if err != nil {
 
-				fmt.Println("start instance error ", err)
-				return
+			if instance.NeedRestart {
+				newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
+				if err != nil {
+
+					fmt.Println("start instance error ", err)
+					return
+				}
+				instance.Pid = newPid
+				//启动后等几秒钟再使其进入可服务状态，没有监听instance的cmd输出内容来判断，因为不希望那么耦合
+				instance.Status = StatusWillRunning
+				time.Sleep(time.Duration(service.Data.DelayRunningTime) * time.Second)
+				instance.Status = StatusRunning
+				instance.NeedRestart = false
+				//启动以后再开始停止下一个
+				service.stopOne()
 			}
-			instance.Pid = newPid
-			//启动后等几秒钟再使其进入可服务状态，没有监听instance的cmd输出内容来判断，因为不希望那么耦合
-			instance.Status = StatusWillRunning
-			time.Sleep(time.Duration(service.Data.DelayRunningTime) * time.Second)
-			instance.Status = StatusRunning
 
-			//启动以后再开始停止下一个
-			service.stopOne()
 		}
 	}()
 
@@ -265,7 +271,7 @@ func (service *Service) RestartOneByOne() {
 	for _, instance := range service.Instances {
 		//先标记为都需要停止
 		instance.Status = StatusWaitingStop
-
+		instance.NeedRestart = true
 	}
 
 	//开始停止第一个
@@ -302,10 +308,13 @@ func (service *Service) stopOne() {
 
 }
 
+// RestartAllInstances 同时重启所有实例 这个没有意义
+// deprecated
 func (service *Service) RestartAllInstances() {
 	// 停止并重新启动所有服务实例
 	for i, instance := range service.Instances {
 		instance.Status = StatusWaitingStop
+		instance.NeedRestart = true
 		fmt.Printf("Stopping instance %d\n", i)
 		err := service.StopInstance(instance.Pid)
 		if err != nil {
@@ -334,7 +343,25 @@ func (service *Service) StopInstance(pid string) error {
 	cmd := exec.Command("kill", "-TERM", pid)
 	err := cmd.Run()
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			fmt.Println("exit error", exitErr.ProcessState.String())
+		}
+
 		return err
 	}
 	return nil
+}
+
+// Stop
+// 停止所有的实例
+func (service *Service) Stop() {
+	for _, instance := range service.Instances {
+		instance.Status = StatusStopping
+		err := service.StopInstance(instance.Pid)
+		if err != nil {
+			fmt.Println("Stop instance got error", err)
+			return
+		}
+	}
 }

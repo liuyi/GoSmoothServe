@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"smoothserver/config"
 	"smoothserver/service"
+	"syscall"
 )
 
 var configPath = "./smoothserve.yaml"
@@ -29,6 +32,8 @@ func main() {
 		// 在这里启动服务实例
 		go createProxy(serviceData)
 	}
+	go listenCommand()
+	go handleSysSig()
 
 	// 阻塞主 goroutine
 	<-make(chan struct{})
@@ -39,4 +44,56 @@ func createProxy(serviceData config.ServiceData) {
 	srv := service.New(serviceData)
 	ServicesMap[serviceData.Name] = srv
 	srv.Start()
+}
+
+func listenCommand() {
+
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("hello!"))
+		action := string(request.Form.Get("action"))
+		serviceName := string(request.Form.Get("service_name"))
+
+		if action == "stop" {
+			if serviceName != "" {
+				mService := ServicesMap[serviceName]
+				if mService == nil {
+					writer.Write([]byte("Can't find the service:" + serviceName))
+				} else {
+					mService.Stop()
+				}
+			} else {
+
+			}
+		}
+	})
+	address := fmt.Sprintf(config.ConfigData.ProxyAddr, ":", config.ConfigData.CommandPort)
+	http.ListenAndServe(address, nil)
+}
+
+func handleSysSig() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM)
+	fmt.Println("smoothserve 开始侦听系统信号")
+	go func() {
+		for {
+
+			sig := <-sigCh
+
+			switch sig {
+			case syscall.SIGTERM:
+				exitServe()
+			default:
+				fmt.Println("收到来自系统信号:", sig)
+			}
+
+		}
+	}()
+}
+
+func exitServe() {
+	fmt.Println("smoothserve will exit:")
+	for _, mService := range ServicesMap {
+		fmt.Println("smoothserve stop service:", mService.Name)
+		mService.Stop()
+	}
 }

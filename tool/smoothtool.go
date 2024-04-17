@@ -3,6 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +46,7 @@ func main() {
 	}
 	if startAction {
 		if start != "" {
-			startService()
+			startService(start)
 		} else {
 			startServe()
 		}
@@ -52,7 +55,12 @@ func main() {
 	}
 
 	if stopAction {
-		stopServe()
+		if stop != "" {
+			stopService(stop)
+		} else {
+			stopServe()
+		}
+
 		return
 	}
 
@@ -173,7 +181,16 @@ func stopServe() {
 	cmd := exec.Command("kill", strconv.Itoa(pid), "-TERM")
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("kill GoSmoothServe failed, error is ", err)
+		// 检查是否是 exec.ExitError 类型
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			// 获取进程的退出状态
+			exitCode := exitErr.ExitCode()
+
+			fmt.Println("exit code:", exitCode, " status:", exitErr.ProcessState.String())
+		} else {
+			fmt.Println("kill GoSmoothServe failed:", err)
+		}
+
 		return
 	}
 
@@ -187,14 +204,47 @@ func stopServe() {
 	fmt.Println("GoSmoothServe service stopped safety.")
 }
 
-func startService() {
+func startService(serviceName string) {
+	formData := url.Values{}
+	formData.Set("action", "start")
+	formData.Set("service_name", serviceName)
 
+	post(formData)
 }
 
-func stopService() {
+func stopService(serviceName string) {
+	formData := url.Values{}
+	formData.Set("action", "stop")
+	formData.Set("service_name", serviceName)
 
+	post(formData)
 }
 
-func resetService() {
+func restartService(serviceName string) {
+	formData := url.Values{}
+	formData.Set("action", "restart")
+	formData.Set("service_name", serviceName)
 
+	post(formData)
+}
+
+func post(formData url.Values) (string, error) {
+	url := fmt.Sprintf("http://", config.ConfigData.ProxyAddr, ":", config.ConfigData.CommandPort)
+	response, err := http.PostForm(url, formData)
+	if err != nil {
+		return "", err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(response.Body)
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
