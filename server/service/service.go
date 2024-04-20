@@ -61,10 +61,10 @@ func (service *Service) Start() {
 		http.HandleFunc(serverName+"/", service.handleRequest)
 	}
 
-	fmt.Printf("Reverse Proxy Server for Service %s started on port %d\n", service.Name, service.Data.Port)
+	fmt.Printf("Service %s started on port %d\n", service.Name, service.Data.Port)
 	err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
 	if err != nil {
-		fmt.Printf("Failed to start Reverse Proxy Server for Service %s: %s\n", service.Name, err)
+		fmt.Printf("Failed to start Service %s: %s\n", service.Name, err)
 	}
 
 }
@@ -166,6 +166,10 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 				instance.NeedRestart = false
 				//启动以后再开始停止下一个
 				service.stopOne()
+			} else {
+				if service.stopWg != nil {
+					service.stopWg.Done()
+				}
 			}
 
 		} else {

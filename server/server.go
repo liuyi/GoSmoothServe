@@ -26,19 +26,26 @@ func main() {
 	config.LoadServerMap(config.ConfigData.SubConfigDir)
 
 	//// 打印加载的服务配置
-	fmt.Println("Loaded services:")
-	for name, serviceData := range config.ServicesDataMap {
-		fmt.Printf("ServiceData Name: %s, Port: %d\n", name, serviceData.Port)
-		// 在这里启动服务实例
-		go createProxy(serviceData)
-	}
+
 	go listenCommand()
 	go handleSysSig()
+	//默认启动时直接启动所有服务
+	startAllService()
 
 	// 阻塞主 goroutine
 	<-make(chan struct{})
 }
-
+func startAllService() {
+	if config.ServicesDataMap == nil {
+		fmt.Println("Should create config for services, before start it")
+		return
+	}
+	for _, serviceData := range config.ServicesDataMap {
+		//fmt.Printf("Servcie %s will start, and listen at port: %d\n", name, serviceData.Port)
+		// 在这里启动服务实例
+		go createProxy(serviceData)
+	}
+}
 func createProxy(serviceData config.ServiceData) {
 	// 启动反向代理服务器
 	srv := service.New(serviceData)
@@ -49,17 +56,20 @@ func createProxy(serviceData config.ServiceData) {
 func listenCommand() {
 
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
-		writer.Write([]byte("hello!"))
-		action := string(request.Form.Get("action"))
-		serviceName := string(request.Form.Get("service_name"))
+
+		action := string(request.PostFormValue("action"))
+		serviceName := string(request.PostFormValue("service_name"))
 
 		if action == "stop" {
+
 			if serviceName != "" {
 				mService := ServicesMap[serviceName]
 				if mService == nil {
 					writer.Write([]byte("Can't find the service:" + serviceName))
 				} else {
+					writer.Write([]byte(fmt.Sprintf("service %s will be stop  ", serviceName)))
 					mService.Stop()
+					writer.Write([]byte(fmt.Sprintf("service  %s stopped safety. ", serviceName)))
 				}
 			} else {
 				exitServe()
@@ -69,6 +79,19 @@ func listenCommand() {
 
 		if action == "start" {
 
+			if serviceName != "" {
+				mService := ServicesMap[serviceName]
+				if mService == nil {
+					writer.Write([]byte("Can't find the service:" + serviceName))
+				} else {
+					mService.Start()
+					writer.Write([]byte(fmt.Sprintf("service  %s  start. ", serviceName)))
+				}
+			} else {
+				//todo stop all
+			}
+
+			return
 		}
 	})
 	address := fmt.Sprintf("%s:%d", config.ConfigData.ProxyAddr, config.ConfigData.CommandPort)

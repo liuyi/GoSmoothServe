@@ -220,7 +220,12 @@ func stopService(serviceName string) {
 	formData.Set("action", "stop")
 	formData.Set("service_name", serviceName)
 
-	post(formData)
+	_, err := post(formData)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("stop service done")
+
 }
 
 func restartService(serviceName string) {
@@ -240,7 +245,12 @@ func post(data url.Values) (string, error) {
 		fmt.Println(err)
 		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
-	defer resp.Body.Close() // 确保响应体关闭
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println("close body ", err)
+		}
+	}(resp.Body) // 确保响应体关闭
 
 	// 检查响应状态码
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
