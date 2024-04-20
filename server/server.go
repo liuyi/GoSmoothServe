@@ -30,12 +30,12 @@ func main() {
 	go listenCommand()
 	go handleSysSig()
 	//默认启动时直接启动所有服务
-	startAllService()
+	createAnStartAllService()
 
 	// 阻塞主 goroutine
 	<-make(chan struct{})
 }
-func startAllService() {
+func createAnStartAllService() {
 	if config.ServicesDataMap == nil {
 		fmt.Println("Should create config for services, before start it")
 		return
@@ -50,7 +50,23 @@ func createProxy(serviceData config.ServiceData) {
 	// 启动反向代理服务器
 	srv := service.New(serviceData)
 	ServicesMap[serviceData.Name] = srv
-	srv.Start()
+	srv.CreateAndListen()
+
+	go srv.Start()
+}
+
+func startAllService() {
+	for name := range ServicesMap {
+		srv := ServicesMap[name]
+		srv.Start()
+	}
+}
+
+func restartAllService() {
+	for name := range ServicesMap {
+		srv := ServicesMap[name]
+		srv.RestartOneByOne()
+	}
 }
 
 func listenCommand() {
@@ -65,11 +81,20 @@ func listenCommand() {
 			if serviceName != "" {
 				mService := ServicesMap[serviceName]
 				if mService == nil {
-					writer.Write([]byte("Can't find the service:" + serviceName))
+					_, err := writer.Write([]byte("Can't find the service:" + serviceName))
+					if err != nil {
+						return
+					}
 				} else {
-					writer.Write([]byte(fmt.Sprintf("service %s will be stop  ", serviceName)))
+					_, err := writer.Write([]byte(fmt.Sprintf("service %s will be stop  ", serviceName)))
+					if err != nil {
+						return
+					}
 					mService.Stop()
-					writer.Write([]byte(fmt.Sprintf("service  %s stopped safety. ", serviceName)))
+					_, err = writer.Write([]byte(fmt.Sprintf("service  %s stopped safety. ", serviceName)))
+					if err != nil {
+						return
+					}
 				}
 			} else {
 				exitServe()
@@ -82,20 +107,60 @@ func listenCommand() {
 			if serviceName != "" {
 				mService := ServicesMap[serviceName]
 				if mService == nil {
-					writer.Write([]byte("Can't find the service:" + serviceName))
+					_, err := writer.Write([]byte("Can't find the service:" + serviceName))
+					if err != nil {
+						return
+					}
 				} else {
 					mService.Start()
-					writer.Write([]byte(fmt.Sprintf("service  %s  start. ", serviceName)))
+					_, err := writer.Write([]byte(fmt.Sprintf("service  %s  all instance started. ", serviceName)))
+					if err != nil {
+						return
+					}
 				}
 			} else {
-				//todo stop all
+				//todo start all
+				//一般不要这样干 启动代理服务器的时候会自动启动所有的服务
+				startAllService()
+			}
+
+			return
+		}
+
+		if action == "restart" {
+			if serviceName != "" {
+				mService := ServicesMap[serviceName]
+				if mService == nil {
+					_, err := writer.Write([]byte("Can't find the service:" + serviceName))
+					if err != nil {
+						return
+					}
+				} else {
+					mService.RestartOneByOne()
+					_, err := writer.Write([]byte(fmt.Sprintf("service  %s  restart. ", serviceName)))
+					if err != nil {
+						return
+					}
+				}
+			} else {
+				//todo start all
+				//一般不要这样干 重启代理服务器就行了
+				_, err := writer.Write([]byte(fmt.Sprintf("do restart all service.")))
+				if err != nil {
+					return
+				}
+				restartAllService()
+
 			}
 
 			return
 		}
 	})
 	address := fmt.Sprintf("%s:%d", config.ConfigData.ProxyAddr, config.ConfigData.CommandPort)
-	http.ListenAndServe(address, nil)
+	err := http.ListenAndServe(address, nil)
+	if err != nil {
+		return
+	}
 }
 
 func handleSysSig() {
@@ -119,7 +184,7 @@ func handleSysSig() {
 }
 
 func exitServe() {
-	fmt.Println("smoothserve will exit:")
+	fmt.Println("smoothserve will exit")
 	for _, mService := range ServicesMap {
 		fmt.Println("smoothserve stopping service:", mService.Name)
 		mService.Stop()

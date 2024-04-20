@@ -19,6 +19,7 @@ var (
 	configPath      string = ""
 	force           bool
 	start           string
+	restart         string
 	stop            string
 	smoothServeName string = "smoothserve"
 	smoothServePath string = "./smoothserve"
@@ -31,6 +32,7 @@ func main() {
 	fmt.Println("GoSmoothServe tool work directory:", wordDirectory)
 	flag.StringVar(&start, "start", "", "-start service_name #启动某一个服务, 如果为all的话，启动全部")
 	flag.StringVar(&stop, "stop", "", "-stop service_name #停止某一个服务, 如果为all的话，停止全部")
+	flag.StringVar(&restart, "restart", "", "-restart service_name #无缝重启某一个服务, 如果为all的话，重启所有服务的实例")
 	flag.BoolVar(&force, "force", false, "-force 强制执行停止时使用，会直接杀死进程 -stop all -force true")
 	flag.StringVar(&configPath, "config", "./smoothserve.yaml", "smoothserve的配置文件，一般不要设置")
 
@@ -59,6 +61,15 @@ func main() {
 			stopService(stop)
 		} else {
 			stopServe(force)
+		}
+		return
+	}
+
+	if len(restart) > 0 {
+		if restart != "all" {
+			restartService(restart)
+		} else {
+			restartService("")
 		}
 		return
 	}

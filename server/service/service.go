@@ -25,7 +25,7 @@ const (
 	StatusRunning
 )
 
-type ServiceInstance struct {
+type Instance struct {
 	Pid         string
 	Port        int
 	Status      int
@@ -36,8 +36,9 @@ type ServiceInstance struct {
 type Service struct {
 	Name          string
 	Data          config.ServiceData
-	Instances     []*ServiceInstance
+	Instances     []*Instance
 	instanceIndex int
+	initialized   bool //服务已经被初始化，创建了实例、文件监听等
 	mutex         sync.Mutex
 	watcher       *fsnotify.Watcher
 	stopWg        *sync.WaitGroup //当服务的实例等待停止时，要设定完成以便于在停止所有实例时，能够安全退出serve
@@ -47,52 +48,88 @@ func New(serviceData config.ServiceData) *Service {
 	service := Service{Name: serviceData.Name, Data: serviceData}
 	return &service
 }
-func (service *Service) Start() {
+func (service *Service) CreateAndListen() {
 	// 创建反向代理服务器
 	// 启动 HTTP 服务器并监听指定端口
-	go service.startAllInstance()
+
+	//
+	//if service.initialized {
+	//	return
+	//}
+	//service.initialized = true
 	go service.initWatcher()
 
-	//http.HandleFunc("/", service.handleRequest)
-	//检测是否有多个名字
-	serverNameArr := strings.Split(service.Data.ServerName, ",")
-	for _, serverName := range serverNameArr {
-		serverName := strings.TrimSpace(serverName)
-		http.HandleFunc(serverName+"/", service.handleRequest)
-	}
+	//检测是否有多个名字,给每一个域名都做反向代理
 
-	fmt.Printf("Service %s started on port %d\n", service.Name, service.Data.Port)
-	err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
-	if err != nil {
-		fmt.Printf("Failed to start Service %s: %s\n", service.Name, err)
-	}
+	go func() {
+		serverNameArr := strings.Split(service.Data.ServerName, ",")
+		for _, serverName := range serverNameArr {
+			serverName := strings.TrimSpace(serverName)
+			http.HandleFunc(serverName+"/", service.handleRequest)
+		}
+
+		fmt.Printf("Service %s started on port %d\n", service.Name, service.Data.Port)
+
+		err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
+		if err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				fmt.Printf("port %d is in use, please check or change to another one\n", service.Data.Port)
+			} else {
+				fmt.Printf("Failed to start Service %s: %s\n", service.Name, err)
+			}
+
+		}
+
+	}()
 
 }
-func (service *Service) startAllInstance() {
+
+func (service *Service) Start() {
 	// 根据配置启动服务实例，并添加到 ServicesMap 中
 	if service.Instances == nil {
-		instances := make([]*ServiceInstance, service.Data.InstanceCount)
+		instances := make([]*Instance, service.Data.InstanceCount)
 		service.Instances = instances
 	} else {
 		//如果已经存在，就不要继续了
-		fmt.Println("Service Started already!")
-		return
+		//fmt.Println("Service Started already!")
+		//return
 	}
 
 	for i := 0; i < service.Data.InstanceCount; i++ {
-		port := service.Data.StartInstancePort + i
-		// 启动服务实例
-		pid, err := service.StartInstance(service.Data.Name, port, service.Data.ExecutablePath) //启动了一个web实例以后 被堵塞 无法继续，应该如何解决
-		if err != nil {
-			fmt.Println("Failed to start service instance:", err)
-			continue
+		if service.Instances[i] == nil {
+			//create new instance
+			port := service.Data.StartInstancePort + i
+			// 启动服务实例
+			pid, err := service.StartInstance(service.Data.Name, port, service.Data.ExecutablePath) //启动了一个web实例以后 被堵塞 无法继续，应该如何解决
+			if err != nil {
+				fmt.Println("Failed to start service instance:", err)
+				continue
+			}
+			instance := &Instance{Pid: pid, Port: port, Status: StatusRunning}
+			service.Instances[i] = instance
+		} else {
+			//已经存在老的实例
+			instance := service.Instances[i]
+			if instance.Status == StatusStopped && instance.NeedRestart != true {
+				//如果已被停止，而且没有处于自动重启的状态
+				newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
+				if err != nil {
+
+					fmt.Println("start one instance of all,got error ", err)
+					return
+				}
+				instance.Pid = newPid
+				//启动后等几秒钟再使其进入可服务状态，没有监听instance的cmd输出内容来判断，因为不希望那么耦合
+				instance.Status = StatusWillRunning
+				time.Sleep(time.Duration(service.Data.DelayRunningTime) * time.Second)
+				instance.Status = StatusRunning
+			}
 		}
-		instance := &ServiceInstance{Pid: pid, Port: port, Status: StatusRunning}
-		service.Instances[i] = instance
+
 	}
 
 }
-func (service *Service) SelectInstance() *ServiceInstance {
+func (service *Service) SelectInstance() *Instance {
 	if len(service.Instances) == 0 {
 		return nil
 	}
@@ -210,6 +247,9 @@ func (service *Service) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 func (service *Service) initWatcher() {
 	// 创建新的fsnotify watcher
+	if service.watcher != nil {
+		return
+	}
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		fmt.Println("Error creating watcher:", err)
@@ -267,7 +307,7 @@ func (service *Service) initWatcher() {
 	}()
 }
 
-func (service *Service) getInstance(pid string) *ServiceInstance {
+func (service *Service) getInstance(pid string) *Instance {
 	for _, instance := range service.Instances {
 		if instance.Pid == pid {
 			return instance
@@ -289,7 +329,7 @@ func (service *Service) RestartOneByOne() {
 }
 
 func (service *Service) stopOne() {
-	var selectedInstance *ServiceInstance
+	var selectedInstance *Instance
 	for _, instance := range service.Instances {
 		//先标记为都需要停止
 		if instance.Status == StatusWaitingStop {
@@ -315,36 +355,6 @@ func (service *Service) stopOne() {
 		return
 	}
 
-}
-
-// RestartAllInstances 同时重启所有实例 这个没有意义
-// deprecated
-func (service *Service) RestartAllInstances() {
-	// 停止并重新启动所有服务实例
-	for i, instance := range service.Instances {
-		instance.Status = StatusWaitingStop
-		instance.NeedRestart = true
-		fmt.Printf("Stopping instance %d\n", i)
-		err := service.StopInstance(instance.Pid)
-		if err != nil {
-			fmt.Printf("Error stopping instance %d: %s\n", i, err)
-			continue
-		}
-
-		fmt.Printf("Starting instance %d\n", i)
-		pid, err := service.StartInstance(service.Data.Name, instance.Port, service.Data.ExecutablePath)
-		if err != nil {
-			fmt.Printf("Error starting instance %d: %s\n", i, err)
-			continue
-		}
-		service.Instances[i].Pid = pid
-		//重启完毕后 如果不重新设置watcher 那么如果更新正在执行的go二进制文件，则不会有事件，系统有缓存机制。
-		watcherErr := service.watcher.Close()
-		if watcherErr != nil {
-			return
-		}
-		go service.initWatcher()
-	}
 }
 
 func (service *Service) StopInstance(pid string) error {
