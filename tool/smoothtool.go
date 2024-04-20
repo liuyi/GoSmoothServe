@@ -9,15 +9,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"server/config"
+	"smoothserver/config"
+	"smoothserver/quicktool"
 	"strconv"
 	"strings"
 )
 
 var (
-	configPath string = ""
-
-	action          string
+	configPath      string = ""
+	force           bool
 	start           string
 	stop            string
 	smoothServeName string = "smoothserve"
@@ -25,54 +25,44 @@ var (
 )
 
 func main() {
+	//todo 修改成统一的ubuntu参数
 	fmt.Println("Start SmoothServe Tool...")
 	wordDirectory, _ := os.Getwd()
 	fmt.Println("GoSmoothServe tool work directory:", wordDirectory)
-	flag.StringVar(&start, "start", "", "启动GoSmoothServe")
-	flag.StringVar(&stop, "stop", "", "停止GoSmoothServe")
-	flag.StringVar(&action, "action", "", "执行动作")
+	flag.StringVar(&start, "start", "", "-start service_name #启动某一个服务, 如果为all的话，启动全部")
+	flag.StringVar(&stop, "stop", "", "-stop service_name #停止某一个服务, 如果为all的话，停止全部")
+	flag.BoolVar(&force, "force", false, "-force 强制执行停止时使用，会直接杀死进程 -stop all -force true")
 	flag.StringVar(&configPath, "config", "./smoothserve.yaml", "smoothserve的配置文件，一般不要设置")
 
 	flag.Parse()
 
+	fmt.Println("cmd start", start, "stop", stop)
+
 	config.LoadConfig(configPath)
 
-	startAction := hasArg("start")
-	stopAction := hasArg("stop")
-
-	if startAction && stopAction {
+	if len(start) > 0 && len(stop) > 0 {
 		fmt.Println("The two command can only set one of them.")
 		os.Exit(1)
 	}
-	if startAction {
-		if start != "" {
+
+	if len(start) > 0 {
+		if start != "all" {
 			startService(start)
 		} else {
 			startServe()
 		}
-
 		return
 	}
 
-	if stopAction {
-		if stop != "" {
+	if len(stop) > 0 {
+		if stop != "all" {
 			stopService(stop)
 		} else {
-			stopServe()
+			stopServe(force)
 		}
-
 		return
 	}
 
-}
-func hasArg(name string) bool {
-	args := flag.Args()
-	for _, arg := range args {
-		if arg == name {
-			return true
-		}
-	}
-	return false
 }
 
 func getProcessPid(processName string) (int, error) {
@@ -94,6 +84,7 @@ func getProcessPid(processName string) (int, error) {
 				if err != nil {
 					return 0, fmt.Errorf("failed to parse PID")
 				}
+				fmt.Println("found pid line", fields)
 				return pid, nil
 			}
 		}
@@ -163,22 +154,31 @@ func startServe() {
 	fmt.Println("GoSmoothServe is running, pid is " + pid)
 }
 
-func stopServe() {
-	pid, err := getProcessPid(smoothServeName)
+func stopServe(force bool) {
 
+	processes, err := quicktool.GetProcessInfo(smoothServeName)
+	//
 	if err != nil {
 		fmt.Println("Find process pid failed,error:", err)
 		return
 	}
+	for _, psInfo := range processes {
 
-	// 如果找不到进程，则直接返回
-	if pid == 0 {
-		fmt.Println("No process pid found, GoSmoothServe not running.")
-		return
+		fmt.Println("ps PID:", psInfo.PID, "program", psInfo.ExecutablePath, "args:", psInfo.Arguments)
 	}
+	// 如果找不到进程，则直接返回
+	psInfo := processes[0]
+	pid := psInfo.PID
 
+	var cmd *exec.Cmd
 	// 使用 kill 命令终止进程
-	cmd := exec.Command("kill", strconv.Itoa(pid), "-TERM")
+	if force {
+		fmt.Println("Kill process immediately!")
+		cmd = exec.Command("kill", strconv.Itoa(pid), "-9")
+	} else {
+		cmd = exec.Command("kill", strconv.Itoa(pid), "-TERM")
+
+	}
 	err = cmd.Run()
 	if err != nil {
 		// 检查是否是 exec.ExitError 类型
@@ -186,20 +186,21 @@ func stopServe() {
 			// 获取进程的退出状态
 			exitCode := exitErr.ExitCode()
 
-			fmt.Println("exit code:", exitCode, " status:", exitErr.ProcessState.String())
+			fmt.Println("wait exit,code:", exitCode, " status:", exitErr.ProcessState)
+			fmt.Println("If smoothserve is start as service, stop it use command: sudo systemctl stop smoothserve")
+			return
 		} else {
-			fmt.Println("kill GoSmoothServe failed:", err)
+			fmt.Println("kill smoothserve failed:", err)
 		}
 
-		return
 	}
 
 	// 等待进程完全退出
-	//err = cmd.Wait()
-	//if err != nil {
-	//	fmt.Println("Wating GoSmoothServe  exit, got error: ", err)
-	//	return
-	//}
+	err = cmd.Wait()
+	if err != nil {
+		fmt.Println("Wating smoothserve  exit, got error: ", err)
+		return
+	}
 
 	fmt.Println("GoSmoothServe service stopped safety.")
 }
@@ -213,6 +214,8 @@ func startService(serviceName string) {
 }
 
 func stopService(serviceName string) {
+
+	fmt.Println("stop service ", serviceName)
 	formData := url.Values{}
 	formData.Set("action", "stop")
 	formData.Set("service_name", serviceName)
@@ -228,23 +231,30 @@ func restartService(serviceName string) {
 	post(formData)
 }
 
-func post(formData url.Values) (string, error) {
-	url := fmt.Sprintf("http://", config.ConfigData.ProxyAddr, ":", config.ConfigData.CommandPort)
-	response, err := http.PostForm(url, formData)
+func post(data url.Values) (string, error) {
+	url := fmt.Sprintf("http://%s:%d", config.ConfigData.ProxyAddr, config.ConfigData.CommandPort)
+	fmt.Println("url:", url)
+	// 构建POST请求
+	resp, err := http.PostForm(url, data)
 	if err != nil {
-		return "", err
+		fmt.Println(err)
+		return "", fmt.Errorf("failed to send POST request: %v", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
+	defer resp.Body.Close() // 确保响应体关闭
+
+	// 检查响应状态码
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		// 读取响应体
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-
+			return "", fmt.Errorf("failed to read response body: %v", err)
 		}
-	}(response.Body)
-
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", err
+		str := string(body)
+		fmt.Println("resp:", str)
+		return str, nil
 	}
 
-	return string(body), nil
+	fmt.Println(resp.Status)
+	// 如果状态码不是2xx，返回错误
+	return "", fmt.Errorf("received non-2xx status code: %v", resp.StatusCode)
 }

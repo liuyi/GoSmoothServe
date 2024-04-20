@@ -23,9 +23,9 @@ type ServiceData struct {
 }
 
 type SmoothServeConfig struct {
-	CommandPort  int
-	ProxyAddr    string
-	ProxyPort    int
+	CommandPort int
+	ProxyAddr   string
+
 	SubConfigDir string
 }
 
@@ -44,8 +44,6 @@ func LoadConfig(configPath string) {
 	if err != nil {
 		return
 	}
-
-	fmt.Println("smoothserve config:", ConfigData.CommandPort, ConfigData.SubConfigDir)
 
 	viper.WatchConfig()
 	viper.OnConfigChange(func(in fsnotify.Event) {

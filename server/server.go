@@ -62,11 +62,16 @@ func listenCommand() {
 					mService.Stop()
 				}
 			} else {
-
+				exitServe()
 			}
+			return
+		}
+
+		if action == "start" {
+
 		}
 	})
-	address := fmt.Sprintf(config.ConfigData.ProxyAddr, ":", config.ConfigData.CommandPort)
+	address := fmt.Sprintf("%s:%d", config.ConfigData.ProxyAddr, config.ConfigData.CommandPort)
 	http.ListenAndServe(address, nil)
 }
 
@@ -93,7 +98,10 @@ func handleSysSig() {
 func exitServe() {
 	fmt.Println("smoothserve will exit:")
 	for _, mService := range ServicesMap {
-		fmt.Println("smoothserve stop service:", mService.Name)
+		fmt.Println("smoothserve stopping service:", mService.Name)
 		mService.Stop()
+		fmt.Println(mService.Name, "stopped")
 	}
+	fmt.Println("All service are stopped, exit serve")
+	os.Exit(0)
 }

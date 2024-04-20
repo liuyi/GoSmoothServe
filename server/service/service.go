@@ -40,6 +40,7 @@ type Service struct {
 	instanceIndex int
 	mutex         sync.Mutex
 	watcher       *fsnotify.Watcher
+	stopWg        *sync.WaitGroup //当服务的实例等待停止时，要设定完成以便于在停止所有实例时，能够安全退出serve
 }
 
 func New(serviceData config.ServiceData) *Service {
@@ -167,6 +168,10 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 				service.stopOne()
 			}
 
+		} else {
+			if service.stopWg != nil {
+				service.stopWg.Done()
+			}
 		}
 	}()
 
@@ -345,9 +350,12 @@ func (service *Service) StopInstance(pid string) error {
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
+
 			fmt.Println("exit error", exitErr.ProcessState.String())
 		}
-
+		if service.stopWg != nil {
+			service.stopWg.Done()
+		}
 		return err
 	}
 	return nil
@@ -356,12 +364,15 @@ func (service *Service) StopInstance(pid string) error {
 // Stop
 // 停止所有的实例
 func (service *Service) Stop() {
+	service.stopWg = new(sync.WaitGroup)
 	for _, instance := range service.Instances {
 		instance.Status = StatusStopping
+		service.stopWg.Add(1)
 		err := service.StopInstance(instance.Pid)
 		if err != nil {
 			fmt.Println("Stop instance got error", err)
 			return
 		}
 	}
+	service.stopWg.Wait()
 }

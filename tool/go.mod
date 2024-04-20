@@ -2,9 +2,9 @@ module smoothtool
 
 go 1.21
 
-replace server => ../server  //这样就可以在本地寻找包了
+replace smoothserver => ../server  //这样就可以在本地寻找包了
 
-require server v0.0.0-00010101000000-000000000000
+require smoothserver v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect

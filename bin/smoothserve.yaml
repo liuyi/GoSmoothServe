@@ -1,4 +1,3 @@
 CommandPort: 8080
 ProxyAddr: "127.0.0.1"
-ProxyPort: 8085 #nginx 服务器的请求传递过来的端口 如果不使用nginx，则可以设置为80端口。
 SubConfigDir: ./services

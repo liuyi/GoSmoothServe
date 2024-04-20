@@ -1,8 +1,8 @@
 name: zyadmin
 server_name: "local.zyadmin.com, local_api.zyadmin.com"
 server_ip: 127.0.0.1
-port: 8010
-start_instance_port: 8011
+port: 8050
+start_instance_port: 8051
 instance_count: 2
 executable_path: /data/www/zyaps/build/zyaps_linux
 auto_restart: true
