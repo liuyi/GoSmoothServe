@@ -14,25 +14,30 @@ GoSmoothServe is a reverse proxy service designed to seamlessly hot-reload web s
 ##### Start the GoSmoothServe reverse proxy service
 Starting the reverse proxy service will read all configurations under ./service and start all services.
 ````shell
-./smoothtool start
+./smoothtool -start all
 ````
 
 ##### Stop the GoSmoothServe reverse proxy service
 This will stop all services, but it will wait until all connections are completed before completely interrupting the service.
 ````shell
-./smoothtool stop
+./smoothtool -stop all
+````
+
+#### Start a web service
+````shell
+./smoothtool -start example_service_name
 ````
 
 ##### Stop a running web service
 This will stop the service named example_service_name specified in the configuration file, no longer accepting new requests. However, it will wait until all connections are completed before completely interrupting the service.
 ````shell
-./smoothtool stop example_service_name
+./smoothtool -stop example_service_name
 ````
 
 ##### Restart a running web service
 This will restart the service named example_service_name specified in the configuration file, allowing new requests. It will restart multiple instances of the service one by one. Incoming requests will be distributed to the working instances, ensuring no request loss or interruption. Instances processing requests will not be assigned new requests. The service will be restarted once all requests are processed.
 ````shell
-./smoothtool stop example_service_name
+./smoothtool -restart example_service_name
 ````
 
 ### Run as a system service
@@ -45,16 +50,17 @@ sudo bash install_smoothserve.sh
 
 #### Structure List:
 - bin
-    - smooth_tool_linux
-    - smooth_serve_linux
+    - smoothtool
+    - smoothserve
     - smoothserve.yaml
     - services
         + example.com.yaml
+        + example2.com.yaml
 
 #### File Descriptions:
 + bin: Root directory of executable files, can be placed anywhere.
-+ smooth_serve_linux: Runs in the background, accepts HTTP requests from users or passed through nginx proxy, and reverse proxies to various proxied service instances.
-+ smooth_tool_linux: Command-line tool to control the reverse proxy service.
++ smoothserve: Runs in the background, accepts HTTP requests from users or passed through nginx proxy, and reverse proxies to various proxied service instances.
++ smoothtool: Command-line tool to control the reverse proxy service.
 + smoothserve.yaml: Configuration file for reverse proxy (similar to nginx.conf).
 + services: Contains configuration files for proxied services (similar to nginx vhost).
 
@@ -64,7 +70,6 @@ sudo bash install_smoothserve.sh
 ````yaml
 CommandPort: 8080 # Port for smooth_tool_linux to send commands to the reverse proxy service
 ProxyAddr: "127.0.0.1" # IP address of the reverse proxy service
-ProxyPort: 8085 # Port where requests from the nginx server are forwarded. If not using nginx, it can be set to port 80.
 SubConfigDir: ./services
 ````
 

@@ -13,23 +13,34 @@ GoSmoothServe 是一个用于为单台服务器上Web服务提供无缝热更的
 ##### 启动GoSmoothServe反向代理服务
  启动反向代理服务将会读取./service下的所有配置，并启动所有服务
 ````shell
-./smoothtool start
+./smoothtool -start all
 ````
 ##### 停止GoSmoothServe反向代理服务
 将会停止所有的服务，但是会等待所有链接全部完成后才会完全中断服务
 ````shell
-./smoothtool stop
+./smoothtool -stop all
 ````
+
+#### 在代理服务器已开启的状态下，重启所有服务
+````shell
+./smoothtool -restart all
+````
+
+#### 启动某个被停止的服务
+````shell
+./smoothtool -start example_service_name
+````
+
 #### 停止正在运行的web服务
 将会停止配置文件里名字为example_service_name的服务，不再接受新的请求，但是会等待所有链接全部完成后才会完全中断服务
 ````shell
-./smoothtool stop example_service_name
+./smoothtool -stop example_service_name
 ````
 
 #### 重启正在运行的web服务
 将会重启配置文件里名字为example_service_name的服务，同时可以接受新的请求，会对该服务的多个实例依次进行重启，进来的请求会分发给正在工作的实例，不会有请求丢失和中断，有请求正在处理的实例不会被分配新的请求，当所有请求被处理完后会被重启。
 ````shell
-./smoothtool stop example_service_name
+./smoothtool -restart example_service_name
 ````
 
 ### 以系统服务的方式随系统运行
@@ -40,25 +51,25 @@ sudo bash install_smoothserve.sh
 ### 文件夹结构
 #### 结构列表：
 - bin 
-    - smooth_tool_linux
-    - smooth_serve_linux
+    - smoothtool
+    - smoothserve
     - smoothserve.yaml
     - services
        + example.com.yaml
+       + example2.com.yaml
 
 #### 文件说明:
  + bin : 是可执行文件的根目录，可以放在任意位置
- + smooth_serve_linux:在后台运行，接受来自用户或nginx代理传递过来的http请求并反向代理给各被代理的服务实例。
- + smooth_tool_linux: 对反向代理服务进行控制的命令行工具
+ + smoothserve:在后台运行，接受来自用户或nginx代理传递过来的http请求并反向代理给各被代理的服务实例。
+ + smoothtool: 对反向代理服务进行控制的命令行工具
  + smoothserve.yaml: 反向代理的配置文件(类似nginx的nginx.conf)
  + services 放置被代理的服务配置文件(类似nginx的vhost)
 
 ### 配置文件
 #### smoothserve.yaml
 ````yaml
-CommandPort: 8080 #smooth_tool_linux给反向代理服务发送命令的端口
+CommandPort: 8080 #smoothtool给反向代理服务发送命令的端口
 ProxyAddr: "127.0.0.1" #反向代理服务的ip
-ProxyPort: 8085 #nginx 服务器的请求传递过来的端口 如果不使用nginx，则可以设置为80端口。
 SubConfigDir: ./services
 ````
 
@@ -88,3 +99,4 @@ watch_files: #自动重启时，监听的文件和文件夹列表
     flag.IntVar(&servicePort, "port", 8081, "启动服务的端口")
   ````**
  
++ 如果被代理的服务有长链接，则需要在web服务里侦听系统信号，自行处理长链接的断连逻辑
