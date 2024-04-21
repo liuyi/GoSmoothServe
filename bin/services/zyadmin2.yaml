@@ -7,6 +7,7 @@ instance_count: 2
 executable_path: /data/www/zyaps/build/zyaps_linux
 auto_restart: true
 delay_running_time: 3
+delay_update_time: 5 #秒 监控到文件变化，延迟更新服务的时间
 watch_files:
   - ./view
   - ./zyaps_linux

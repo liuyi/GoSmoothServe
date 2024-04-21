@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"smoothserver/config"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +40,7 @@ type Service struct {
 	initialized   bool //服务已经被初始化，创建了实例、文件监听等
 	mutex         sync.Mutex
 	watcher       *fsnotify.Watcher
+	restartTimer  *time.Timer     //重启时的定时器，等待几秒后，如果时间没有被刷新，则正式开始重启
 	stopWg        *sync.WaitGroup //当服务的实例等待停止时，要设定完成以便于在停止所有实例时，能够安全退出serve
 }
 
@@ -100,7 +100,7 @@ func (service *Service) Start() {
 			//create new instance
 			port := service.Data.StartInstancePort + i
 			// 启动服务实例
-			pid, err := service.StartInstance(service.Data.Name, port, service.Data.ExecutablePath) //启动了一个web实例以后 被堵塞 无法继续，应该如何解决
+			pid, err := service.StartInstance(port, service.Data.ExecutablePath) //启动了一个web实例以后 被堵塞 无法继续，应该如何解决
 			if err != nil {
 				fmt.Println("Failed to start service instance:", err)
 				continue
@@ -112,7 +112,7 @@ func (service *Service) Start() {
 			instance := service.Instances[i]
 			if instance.Status == StatusStopped && instance.NeedRestart != true {
 				//如果已被停止，而且没有处于自动重启的状态
-				newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
+				newPid, err := service.StartInstance(instance.Port, service.Data.ExecutablePath)
 				if err != nil {
 
 					fmt.Println("start one instance of all,got error ", err)
@@ -148,9 +148,9 @@ func (service *Service) SelectInstance() *Instance {
 	return nil
 }
 
-func (service *Service) StartInstance(name string, port int, executablePath string) (string, error) {
+func (service *Service) StartInstance(port int, executablePath string) (string, error) {
 	// 启动指定的 HTTP 服务器进程，并传递端口号作为参数
-	cmd := exec.Command(executablePath, "--port="+strconv.Itoa(port))
+	cmd := exec.Command(executablePath, fmt.Sprintf("-port=%d", port))
 	cmd.Dir = filepath.Dir(executablePath)
 
 	// 设置合适的环境变量等
@@ -178,7 +178,7 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 	go func() {
 		if err := cmd.Wait(); err != nil {
 
-			fmt.Println("Process exited with error:", err)
+			fmt.Println("Service Instance process exited with error:", err)
 		}
 
 		//查看当前是不是实例是不是需要重启
@@ -189,7 +189,7 @@ func (service *Service) StartInstance(name string, port int, executablePath stri
 			instance.Status = StatusStopped
 
 			if instance.NeedRestart {
-				newPid, err := service.StartInstance("", instance.Port, service.Data.ExecutablePath)
+				newPid, err := service.StartInstance(instance.Port, service.Data.ExecutablePath)
 				if err != nil {
 
 					fmt.Println("start instance error ", err)
@@ -295,8 +295,19 @@ func (service *Service) initWatcher() {
 				//	// 如果发生了写入、创建或删除事件，则重新加载服务实例
 				//	service.RestartInstances()
 				//}
-
-				service.RestartOneByOne()
+				// 检测到文件写入事件，启动定时器
+				fmt.Println(">>>>>>>>有文件更新")
+				service.mutex.Lock()
+				if service.restartTimer != nil {
+					// 如果定时器已存在，则停止它
+					fmt.Println("有已经存在的定时器，停止它")
+					service.restartTimer.Stop()
+				}
+				fmt.Println("启动一个定时器，到时间后去重启")
+				// 设置新的定时器
+				service.restartTimer = time.AfterFunc(time.Duration(service.Data.DelayRunningTime)*time.Second, service.RestartOneByOne)
+				service.mutex.Unlock()
+				//service.RestartOneByOne()
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
@@ -309,7 +320,7 @@ func (service *Service) initWatcher() {
 
 func (service *Service) getInstance(pid string) *Instance {
 	for _, instance := range service.Instances {
-		if instance.Pid == pid {
+		if instance != nil && instance.Pid == pid {
 			return instance
 		}
 	}
@@ -317,6 +328,7 @@ func (service *Service) getInstance(pid string) *Instance {
 }
 
 func (service *Service) RestartOneByOne() {
+	fmt.Println("Restart service instance one by one.")
 	for _, instance := range service.Instances {
 		//先标记为都需要停止
 		instance.Status = StatusWaitingStop

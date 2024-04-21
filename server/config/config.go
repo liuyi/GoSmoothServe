@@ -19,6 +19,7 @@ type ServiceData struct {
 	ExecutablePath    string   `yaml:"executable_path"`
 	AutoRestart       bool     `yaml:"auto_restart"`
 	DelayRunningTime  int      `yaml:"delay_running_time"` //启动后等几秒进入可服务状态
+	DelayUpdateTime   int      `yaml:"delay_update_time"`  //有文件更新后等几秒开始重启实例
 	WatchFiles        []string `yaml:"watch_files"`
 }
 
