@@ -38,7 +38,7 @@ func main() {
 
 	flag.Parse()
 
-	fmt.Println("cmd start", start, "stop", stop)
+	//fmt.Println("cmd start", start, "stop", stop)
 
 	config.LoadConfig(configPath)
 
@@ -132,7 +132,7 @@ func startServe() {
 	}
 
 	if runningPid != 0 {
-		fmt.Println("GoSmoothServe is runing already")
+		fmt.Println("GoSmoothServe is runing already, smoothServeName:", smoothServeName, "runningPid:", runningPid)
 		return
 	}
 
@@ -161,8 +161,8 @@ func startServe() {
 	//}
 	//}()
 	// 获取进程 ID
-	pid := fmt.Sprintf("%d", cmd.Process.Pid)
-	fmt.Println("GoSmoothServe is running, pid is " + pid)
+	//pid := fmt.Sprintf("%d", cmd.Process.Pid)
+	//fmt.Println("GoSmoothServe is running, pid is " + pid)
 }
 
 func stopServe(force bool) {
@@ -178,6 +178,11 @@ func stopServe(force bool) {
 		fmt.Println("ps PID:", psInfo.PID, "program", psInfo.ExecutablePath, "args:", psInfo.Arguments)
 	}
 	// 如果找不到进程，则直接返回
+
+	if processes == nil || len(processes) < 0 {
+		fmt.Println("no service is run")
+		return
+	}
 	psInfo := processes[0]
 	pid := psInfo.PID
 
@@ -209,7 +214,7 @@ func stopServe(force bool) {
 	// 等待进程完全退出
 	err = cmd.Wait()
 	if err != nil {
-		fmt.Println("Wating smoothserve  exit, got error: ", err)
+		fmt.Println("Waiting smoothserve  exit: ", err)
 		return
 	}
 
@@ -221,7 +226,10 @@ func startService(serviceName string) {
 	formData.Set("action", "start")
 	formData.Set("service_name", serviceName)
 
-	post(formData)
+	_, err := post(formData)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func stopService(serviceName string) {

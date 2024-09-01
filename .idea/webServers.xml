@@ -9,6 +9,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="222d5cf9-7829-48fa-bbd6-bffc91d7a14d" name="智愉正式服务器" url="">
+        <fileTransfer rootFolder="/smoothserve" host="zyaps.com" port="10062">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
   </component>
 </project>

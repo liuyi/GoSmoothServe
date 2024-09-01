@@ -1,7 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"go.uber.org/zap"
+	"go_service_core/core/log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,15 +17,30 @@ var configPath = "./smoothserve.yaml"
 
 var ServicesMap map[string]*service.Service = make(map[string]*service.Service)
 
+var debug bool = false
+
 //var proxyMap map[string]*reverse_proxy.ReverseProxy = make(map[string]*reverse_proxy.ReverseProxy)
 
 func main() {
 
-	wordDirectory, _ := os.Getwd()
-	fmt.Println("Start SmoothServe service,work directory:", wordDirectory)
-	fmt.Println("Load config", configPath)
+	flag.BoolVar(&debug, "debug", false, "debug = false")
+	workDirectory, _ := os.Getwd()
+
+	/**
+	  file_path: ./log/app.log
+	  max_size: 100
+	  max_backups: 10
+	  max_age: 100
+	  compress: true
+	  debug: true
+	*/
 
 	config.LoadConfig(configPath)
+
+	log.Init(config.ConfigData.Log)
+	log.Info("Start SmoothServe service,work directory:", zap.String("word_directory", workDirectory))
+	log.Info("Load config", zap.String("config", configPath))
+
 	config.LoadServerMap(config.ConfigData.SubConfigDir)
 
 	//// 打印加载的服务配置
@@ -37,7 +55,7 @@ func main() {
 }
 func createAnStartAllService() {
 	if config.ServicesDataMap == nil {
-		fmt.Println("Should create config for services, before start it")
+		log.Info("Should create config for services, before start it")
 		return
 	}
 	for _, serviceData := range config.ServicesDataMap {
@@ -166,7 +184,7 @@ func listenCommand() {
 func handleSysSig() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM)
-	fmt.Println("smoothserve 开始侦听系统信号")
+	log.Info("smoothserve 开始侦听系统信号")
 	go func() {
 		for {
 
@@ -176,7 +194,7 @@ func handleSysSig() {
 			case syscall.SIGTERM:
 				exitServe()
 			default:
-				fmt.Println("收到来自系统信号:", sig)
+				log.Info("收到来自系统信号:", zap.String("sig", sig.String()))
 			}
 
 		}
@@ -184,12 +202,12 @@ func handleSysSig() {
 }
 
 func exitServe() {
-	fmt.Println("smoothserve will exit")
+	log.Info("smoothserve will exit")
 	for _, mService := range ServicesMap {
-		fmt.Println("smoothserve stopping service:", mService.Name)
+		log.Info("stopping service", zap.String("name", mService.Name))
 		mService.Stop()
-		fmt.Println(mService.Name, "stopped")
+		log.Info("service stopped", zap.String("name", mService.Name))
 	}
-	fmt.Println("All service are stopped, exit serve")
+	log.Info("All service are stopped, exit serve")
 	os.Exit(0)
 }

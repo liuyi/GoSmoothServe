@@ -4,7 +4,6 @@
     <target name="liuyi@172.16.151.10:22" />
     <working_directory value="$PROJECT_DIR$/bin/" />
     <go_parameters value="-o $PROJECT_DIR$/bin/smoothtool" />
-    <parameters value="-restart zyaps" />
     <envs>
       <env name="GIN_MODE" value="release" />
     </envs>

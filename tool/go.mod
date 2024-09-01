@@ -1,6 +1,6 @@
 module smoothtool
 
-go 1.21
+go 1.22.5
 
 replace smoothserver => ../server  //这样就可以在本地寻找包了
 

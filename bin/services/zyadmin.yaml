@@ -1,9 +1,10 @@
 name: zyaps
-server_name: "local.zyaps.com , local_api.zyaps.com"
-server_ip:  127.0.0.1
-port: 8085
-start_instance_port: 8087
+server_name: "local.zyaps.com/admin"
+server_ip:  0.0.0.0
+port: 8010
+start_instance_port: 8011
 instance_count: 2
+enabled: false
 executable_path: /data/www/zyaps/build/zyaps_linux
 auto_restart: true
 delay_running_time: 3 #重启实例时的延迟

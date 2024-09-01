@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"go.uber.org/zap"
+	"go_service_core/core/log"
 	"net/http"
 	"net/http/httputil"
 	"os/exec"
@@ -68,16 +70,15 @@ func (service *Service) CreateAndListen() {
 			http.HandleFunc(serverName+"/", service.handleRequest)
 		}
 
-		fmt.Printf("Service %s started on port %d\n", service.Name, service.Data.Port)
+		log.Info("Start service ", zap.String("name", service.Name), zap.Int("port", service.Data.Port))
 
 		err := http.ListenAndServe(fmt.Sprintf(":%d", service.Data.Port), nil)
 		if err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
-				fmt.Printf("port %d is in use, please check or change to another one\n", service.Data.Port)
+				log.Error("port  is in use,connect closed.", zap.Int("port", service.Data.Port))
 			} else {
-				fmt.Printf("Failed to start Service %s: %s\n", service.Name, err)
+				log.Error("Failed to start Service", zap.String("name", service.Name), zap.Error(err))
 			}
-
 		}
 
 	}()
@@ -102,7 +103,7 @@ func (service *Service) Start() {
 			// 启动服务实例
 			pid, err := service.StartInstance(port, service.Data.ExecutablePath) //启动了一个web实例以后 被堵塞 无法继续，应该如何解决
 			if err != nil {
-				fmt.Println("Failed to start service instance:", err)
+				log.Error("Failed to start service instance:", zap.Error(err))
 				continue
 			}
 			instance := &Instance{Pid: pid, Port: port, Status: StatusRunning}
@@ -115,7 +116,7 @@ func (service *Service) Start() {
 				newPid, err := service.StartInstance(instance.Port, service.Data.ExecutablePath)
 				if err != nil {
 
-					fmt.Println("start one instance of all,got error ", err)
+					log.Error("start instance failed", zap.Error(err), zap.Int("port", instance.Port), zap.String("path", service.Data.ExecutablePath))
 					return
 				}
 				instance.Pid = newPid
@@ -159,7 +160,7 @@ func (service *Service) StartInstance(port int, executablePath string) (string, 
 
 	// 启动命令
 	if err = cmd.Start(); err != nil {
-		fmt.Println("run cmd error:", cmd, err)
+		log.Error("start instance failed", zap.String("cmd", cmd.String()), zap.Error(err))
 		return "", err
 	}
 
@@ -178,7 +179,7 @@ func (service *Service) StartInstance(port int, executablePath string) (string, 
 	go func() {
 		if err := cmd.Wait(); err != nil {
 
-			fmt.Println("Service Instance process exited with error:", err)
+			log.Error("Service Instance process exited with error:", zap.Error(err))
 		}
 
 		//查看当前是不是实例是不是需要重启
@@ -192,7 +193,7 @@ func (service *Service) StartInstance(port int, executablePath string) (string, 
 				newPid, err := service.StartInstance(instance.Port, service.Data.ExecutablePath)
 				if err != nil {
 
-					fmt.Println("start instance error ", err)
+					log.Error("start instance error ", zap.Error(err))
 					return
 				}
 				instance.Pid = newPid
@@ -252,7 +253,7 @@ func (service *Service) initWatcher() {
 	}
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Println("Error creating watcher:", err)
+		log.Error("Error creating watcher:", zap.Error(err))
 		return
 	}
 	service.watcher = watcher
@@ -264,7 +265,7 @@ func (service *Service) initWatcher() {
 		absFilePath := filepath.Join(rootDir, path)
 		err = watcher.Add(absFilePath)
 		if err != nil {
-			fmt.Printf("Error adding path %s to watcher: %s\n", absFilePath, err)
+			log.Error("Error adding path to watcher", zap.String("path", absFilePath), zap.Error(err))
 			return
 		}
 	}
@@ -272,10 +273,10 @@ func (service *Service) initWatcher() {
 	// 启动协程监视文件更改
 	go func() {
 		defer func(watcher *fsnotify.Watcher) {
-			fmt.Println("Close watcher")
+			log.Info("Close watcher")
 			err := watcher.Close()
 			if err != nil {
-				fmt.Println("close watcher error", err)
+				log.Error("close watcher error", zap.Error(err))
 			}
 		}(watcher)
 		for {
@@ -284,7 +285,7 @@ func (service *Service) initWatcher() {
 				if !ok {
 					return
 				}
-				fmt.Println("Event:", event.Name, "event.Op:", event.Op, event.Op&fsnotify.Write, fsnotify.Write)
+				log.Info("Event:", zap.String("name", event.Name), zap.String("Op", event.Op.String()))
 
 				//
 				//if event.Op&fsnotify.Write == fsnotify.Write ||
@@ -296,14 +297,14 @@ func (service *Service) initWatcher() {
 				//	service.RestartInstances()
 				//}
 				// 检测到文件写入事件，启动定时器
-				fmt.Println(">>>>>>>>有文件更新")
+				log.Info("有文件更新", zap.String("service", service.Name))
 				service.mutex.Lock()
 				if service.restartTimer != nil {
 					// 如果定时器已存在，则停止它
-					fmt.Println("有已经存在的定时器，停止它")
+					//fmt.Println("有已经存在的定时器，停止它")
 					service.restartTimer.Stop()
 				}
-				fmt.Println("启动一个定时器，到时间后去重启")
+				//fmt.Println("启动一个定时器，到时间后去重启")
 				// 设置新的定时器
 				service.restartTimer = time.AfterFunc(time.Duration(service.Data.DelayRunningTime)*time.Second, service.RestartOneByOne)
 				service.mutex.Unlock()
@@ -312,7 +313,7 @@ func (service *Service) initWatcher() {
 				if !ok {
 					return
 				}
-				fmt.Println("Error:", err)
+				log.Error("watch error", zap.Error(err))
 			}
 		}
 	}()
@@ -328,7 +329,7 @@ func (service *Service) getInstance(pid string) *Instance {
 }
 
 func (service *Service) RestartOneByOne() {
-	fmt.Println("Restart service instance one by one.")
+	log.Info("Restart service instance one by one.")
 	for _, instance := range service.Instances {
 		//先标记为都需要停止
 		instance.Status = StatusWaitingStop
@@ -354,7 +355,7 @@ func (service *Service) stopOne() {
 	if selectedInstance == nil {
 		//已经没有需要停止的了
 
-		fmt.Println("no selectedInstance,all instance stopped ")
+		log.Info("all instance stopped ")
 
 		return
 	}
@@ -363,7 +364,7 @@ func (service *Service) stopOne() {
 	selectedInstance.Status = StatusStopping
 	err := service.StopInstance(selectedInstance.Pid)
 	if err != nil {
-		fmt.Println("stop instance failed,pid:", selectedInstance.Pid+", error:", err)
+		log.Error("stop instance failed,pid:", zap.String("pid", selectedInstance.Pid), zap.Error(err))
 		return
 	}
 
@@ -377,7 +378,7 @@ func (service *Service) StopInstance(pid string) error {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
 
-			fmt.Println("exit error", exitErr.ProcessState.String())
+			log.Error("exit instance error", zap.String("error", exitErr.ProcessState.String()))
 		}
 		if service.stopWg != nil {
 			service.stopWg.Done()
@@ -396,7 +397,7 @@ func (service *Service) Stop() {
 		service.stopWg.Add(1)
 		err := service.StopInstance(instance.Pid)
 		if err != nil {
-			fmt.Println("Stop instance got error", err)
+			log.Error("Stop instance got error", zap.Error(err))
 			return
 		}
 	}

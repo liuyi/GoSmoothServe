@@ -1,3 +1,7 @@
-go 1.21
+go 1.22.5
 
-use .
+use (
+	.
+	./../../go_service_core
+)
+

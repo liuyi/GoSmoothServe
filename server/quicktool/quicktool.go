@@ -1,7 +1,8 @@
 package quicktool
 
 import (
-	"fmt"
+	"go.uber.org/zap"
+	"go_service_core/core/log"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -29,7 +30,8 @@ func GetProcessInfo(processFileName string) ([]Process, error) {
 	cmd := exec.Command("ps", "aux")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("error running ps aux command: %v", err)
+		log.Error("error running ps aux command", zap.Error(err), zap.String("cmd", cmd.String()))
+		return nil, err
 	}
 	lines := strings.Split(string(output), "\n")
 	var processes []Process

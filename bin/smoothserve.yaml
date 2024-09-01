@@ -1,3 +1,10 @@
-CommandPort: 8080
+CommandPort: 8000
 ProxyAddr: "127.0.0.1"
 SubConfigDir: ./services
+log:
+  file_path: ./log/app.log
+  max_size: 100
+  max_backups: 10
+  max_age: 100
+  compress: true
+  debug: true

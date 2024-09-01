@@ -2,6 +2,13 @@
 <project version="4">
   <component name="PublishConfigData" serverName="本地虚拟机" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
+      <paths name="智愉正式服务器">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/" local="$PROJECT_DIR$/bin" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
       <paths name="本地虚拟机">
         <serverdata>
           <mappings>
